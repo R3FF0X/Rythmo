@@ -4,7 +4,7 @@ import type { Event } from "./types";
 
 type Props = {
   initialEvent?: Event;
-  onSubmit: (event: Omit<Event, "id">) => void;
+  onSubmit: (event: Omit<Event, "id">) => string | null;
   onCancel: () => void;
 };
 
@@ -22,22 +22,33 @@ function minutesToTimeString(minutes: number): string {
 function EventForm({ initialEvent, onSubmit, onCancel }: Props) {
   const [label, setLabel] = useState(initialEvent?.label ?? "");
   const [category, setCategory] = useState(initialEvent?.category ?? "");
-  const [startTime, setStartTime] = useState(
-    initialEvent ? minutesToTimeString(initialEvent.startMinutes) : "09:00",
-  );
   const [durationMinutes, setDurationMinutes] = useState(
     initialEvent?.durationMinutes ?? 30,
   );
+  const [isSpecialTime, setIsSpecialTime] = useState(
+    initialEvent?.specialStartMinutes != null,
+  );
+  const [specialTime, setSpecialTime] = useState(
+    initialEvent?.specialStartMinutes != null
+      ? minutesToTimeString(initialEvent.specialStartMinutes)
+      : "09:00",
+  );
+  const [error, setError] = useState<string | null>(null);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!label.trim()) return;
-    onSubmit({
+
+    const result = onSubmit({
       label,
       category,
-      startMinutes: timeStringToMinutes(startTime),
       durationMinutes,
+      specialStartMinutes: isSpecialTime
+        ? timeStringToMinutes(specialTime)
+        : null,
     });
+
+    setError(result);
   }
 
   return (
@@ -58,18 +69,37 @@ function EventForm({ initialEvent, onSubmit, onCancel }: Props) {
         value={category}
         onChange={(e) => setCategory(e.target.value)}
       />
-      <input
-        type="time"
-        value={startTime}
-        onChange={(e) => setStartTime(e.target.value)}
-      />
-      <input
-        type="number"
-        min={5}
-        step={5}
-        value={durationMinutes}
-        onChange={(e) => setDurationMinutes(Number(e.target.value))}
-      />
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="number"
+          min={5}
+          step={5}
+          value={durationMinutes}
+          onChange={(e) => setDurationMinutes(Number(e.target.value))}
+          className="w-20"
+        />
+        minutes
+      </label>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={isSpecialTime}
+          onChange={(e) => setIsSpecialTime(e.target.checked)}
+        />
+        Horaire personnalisé
+      </label>
+
+      {isSpecialTime && (
+        <input
+          type="time"
+          value={specialTime}
+          onChange={(e) => setSpecialTime(e.target.value)}
+        />
+      )}
+
+      {error && <p className="text-red-500 text-sm">{error}</p>}
+
       <div className="flex gap-2">
         <button type="submit">
           {initialEvent ? "Enregistrer" : "Ajouter"}

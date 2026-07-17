@@ -1,10 +1,10 @@
 const palette = [
-  { base: "#145a32", tint: "#1f8a4c" }, // vert
-  { base: "#7a4a12", tint: "#a8651c" }, // ambre
-  { base: "#4c1d78", tint: "#6c2bb0" }, // violet
-  { base: "#7a1f2b", tint: "#a8283a" }, // rouge
-  { base: "#16407a", tint: "#1f5aa8" }, // bleu
-  { base: "#0f6e6e", tint: "#158f8f" }, // teal
+  { from: "#146b3a", to: "#0b3d21" }, // vert
+  { from: "#9a5b12", to: "#5c3509" }, // ambre
+  { from: "#6b21a8", to: "#3b0764" }, // violet
+  { from: "#9f2d3f", to: "#641220" }, // rouge
+  { from: "#1e56a8", to: "#0f2f66" }, // bleu
+  { from: "#0f6e6e", to: "#083f3f" }, // teal
 ];
 
 export function getCategoryColor(category: string) {
