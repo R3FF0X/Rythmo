@@ -33,12 +33,14 @@ function buildTimeOptions(): string[] {
 
 const TIME_OPTIONS = buildTimeOptions();
 
+const BUTTON_TAP = "active:scale-95 transition-transform duration-100";
+
 function DayStartPicker({ onSelect }: Props) {
   const [showCustom, setShowCustom] = useState(false);
   const [customTime, setCustomTime] = useState("09:00");
 
   return (
-    <div className="flex flex-col items-center gap-4 max-w-xs w-full">
+    <div className="flex flex-col items-center gap-5 max-w-xs w-full">
       <p className="text-white text-center text-base">
         À quelle heure commence la journée ?
       </p>
@@ -47,13 +49,13 @@ function DayStartPicker({ onSelect }: Props) {
         <div className="flex flex-col gap-2 w-full">
           <button
             onClick={() => onSelect(nowMinutes())}
-            className="w-full py-2.5 rounded-lg bg-white text-black font-medium"
+            className={`w-full py-2.5 rounded-lg bg-white text-black font-medium ${BUTTON_TAP}`}
           >
             Maintenant
           </button>
           <button
             onClick={() => setShowCustom(true)}
-            className="w-full py-2.5 rounded-lg border border-neutral-700 text-white"
+            className={`w-full py-2.5 rounded-lg border border-neutral-700 text-white ${BUTTON_TAP}`}
           >
             Personnaliser
           </button>
@@ -75,7 +77,7 @@ function DayStartPicker({ onSelect }: Props) {
           </select>
           <button
             onClick={() => onSelect(timeStringToMinutes(customTime))}
-            className="w-full py-2.5 rounded-lg bg-white text-black font-medium"
+            className={`w-full py-2.5 rounded-lg bg-white text-black font-medium ${BUTTON_TAP}`}
           >
             Valider
           </button>

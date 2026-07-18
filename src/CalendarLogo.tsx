@@ -1,0 +1,26 @@
+type Props = {
+  className?: string;
+};
+
+function CalendarLogo({ className }: Props) {
+  return (
+    <svg viewBox="0 0 512 512" className={className} aria-hidden="true">
+      <rect width="512" height="512" rx="100" fill="#ea580c" />
+      <rect x="146" y="112" width="22" height="60" rx="11" fill="#ea580c" />
+      <rect x="344" y="112" width="22" height="60" rx="11" fill="#ea580c" />
+      <rect x="86" y="150" width="340" height="270" rx="24" fill="#ffffff" />
+      <path
+        d="M86 174a24 24 0 0 1 24-24h292a24 24 0 0 1 24 24v40H86v-40z"
+        fill="#ea580c"
+      />
+      <rect x="146" y="104" width="22" height="68" rx="11" fill="#ffffff" />
+      <rect x="344" y="104" width="22" height="68" rx="11" fill="#ffffff" />
+      <rect x="146" y="256" width="54" height="54" rx="10" fill="#ea580c" />
+      <rect x="230" y="256" width="54" height="54" rx="10" fill="#ffedd5" />
+      <rect x="314" y="256" width="54" height="54" rx="10" fill="#ffedd5" />
+      <rect x="146" y="330" width="54" height="54" rx="10" fill="#ffedd5" />
+    </svg>
+  );
+}
+
+export default CalendarLogo;

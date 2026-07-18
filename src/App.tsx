@@ -15,6 +15,8 @@ import Modal from "./Modal";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import ConfirmClearAllModal from "./ConfirmClearAllModal";
 import DayStartPicker from "./DayStartPicker";
+import TrashIcon from "./TrashIcon";
+import CalendarLogo from "./CalendarLogo";
 import { requestNotificationPermission, rescheduleNotifications } from "./notifications";
 
 const STORAGE_KEY = "rythmo-events";
@@ -95,6 +97,8 @@ function App() {
     setDayStartMinutes(minutes);
   }
 
+  // addEvent/updateEvent ne ferment plus le formulaire elles-mêmes : c'est la
+  // modale qui déclenche la fermeture (avec animation) une fois le résultat connu.
   function addEvent(newEvent: Omit<Event, "id">): string | null {
     if (newEvent.specialStartMinutes != null) {
       const conflict = hasSpecialConflict(events, {
@@ -110,7 +114,6 @@ function App() {
       next.splice(index, 0, event);
       return next;
     });
-    setInsertIndex(null);
     return null;
   }
 
@@ -129,7 +132,6 @@ function App() {
     setEvents((prev) =>
       prev.map((event) => (event.id === id ? { ...updated, id } : event)),
     );
-    setEditingId(null);
     return null;
   }
 
@@ -146,7 +148,6 @@ function App() {
     setEvents([]);
     setDayStartMinutes(null);
     localStorage.removeItem(DAY_START_KEY);
-    setShowClearAllConfirm(false);
   }
 
   function updateEventDuration(id: string, durationMinutes: number) {
@@ -309,37 +310,53 @@ function App() {
   ]);
 
   return (
-    <div className="min-h-screen bg-[#1b1d21] flex flex-col items-center p-6 gap-3 pb-20">
-      <div className="flex flex-col items-center gap-1">
-        <h1 className="text-white text-2xl font-semibold text-center capitalize">
-          {TODAY_LABEL}
-        </h1>
-        {dayStartMinutes !== null && (
-          <p className="text-neutral-400 text-sm">
-            Début à {formatMinutes(dayStartMinutes)}
-          </p>
-        )}
-      </div>
-
-      {showClearAllConfirm && (
-        <ConfirmClearAllModal
-          onConfirm={clearAllEvents}
-          onCancel={() => setShowClearAllConfirm(false)}
-        />
-      )}
-
+    <div className="min-h-screen bg-[#1b1d21] flex flex-col">
       {dayStartMinutes === null ? (
-        <div className="flex-1 flex items-center justify-center w-full">
-          <DayStartPicker onSelect={handleSelectDayStart} />
+        <div className="flex flex-col items-center gap-1 pt-10">
+          <CalendarLogo className="w-16 h-16" />
+          <h1 className="text-white text-2xl font-semibold text-center capitalize">
+            {TODAY_LABEL}
+          </h1>
         </div>
       ) : (
-        <div
-          className={`flex-1 w-full flex flex-col items-center ${isEmpty ? "justify-center" : "justify-start"}`}
-        >
+        <header className="fixed top-0 left-0 right-0 z-30 flex items-center gap-2 px-4 py-3 bg-[#1b1d21]/95 backdrop-blur border-b border-neutral-800">
+          <CalendarLogo className="w-8 h-8 flex-shrink-0" />
+          <div className="flex-1 flex flex-col items-center">
+            <h1 className="text-white text-lg font-semibold text-center capitalize">
+              {TODAY_LABEL}
+            </h1>
+            <p className="text-neutral-400 text-xs">
+              Début à {formatMinutes(dayStartMinutes)}
+            </p>
+          </div>
+          <div className="w-8 h-8 flex-shrink-0" />
+        </header>
+      )}
+
+      <div
+        className={`flex-1 overflow-y-auto flex flex-col items-center p-6 gap-3 pb-20 ${dayStartMinutes !== null ? "pt-24" : ""}`}
+      >
+        {dayStartMinutes === null && (
+          <div className="flex-1 w-full flex items-center justify-center">
+            <DayStartPicker onSelect={handleSelectDayStart} />
+          </div>
+        )}
+
+        {showClearAllConfirm && (
+          <ConfirmClearAllModal
+            onConfirm={clearAllEvents}
+            onCancel={() => setShowClearAllConfirm(false)}
+          />
+        )}
+
+        {dayStartMinutes !== null && (
+          <div
+            className={`flex-1 w-full flex flex-col items-center ${isEmpty ? "justify-center" : "justify-start"}`}
+          >
           {isEmpty && !isFormOpen && (
             <button
               onClick={() => setInsertIndex(0)}
-              className="w-14 h-14 rounded-full border border-neutral-700 text-white text-2xl flex items-center justify-center"
+              className="w-14 h-14 rounded-full border border-neutral-700 text-white text-2xl flex items-center justify-center active:scale-95 transition-transform duration-100"
             >
               +
             </button>
@@ -347,26 +364,31 @@ function App() {
 
           {isFormOpen && (
             <Modal onClose={closeForm}>
-              <h2 className="text-white text-base font-semibold mb-3">
-                {editingEvent ? "Modifier la tâche" : "Nouvelle tâche"}
-              </h2>
-              <EventForm
-                initialEvent={editingEvent}
-                onSubmit={(data) =>
-                  editingId ? updateEvent(editingId, data) : addEvent(data)
-                }
-                onCancel={closeForm}
-              />
+              {(close) => (
+                <>
+                  <h2 className="text-white text-base font-semibold mb-3">
+                    {editingEvent ? "Modifier la tâche" : "Nouvelle tâche"}
+                  </h2>
+                  <EventForm
+                    initialEvent={editingEvent}
+                    onSubmit={(data) => {
+                      const result = editingId
+                        ? updateEvent(editingId, data)
+                        : addEvent(data);
+                      if (!result) close();
+                      return result;
+                    }}
+                    onCancel={close}
+                  />
+                </>
+              )}
             </Modal>
           )}
 
           {pendingDeleteEvent && (
             <ConfirmDeleteModal
               label={pendingDeleteEvent.label}
-              onConfirm={() => {
-                deleteEvent(pendingDeleteEvent.id);
-                setPendingDeleteId(null);
-              }}
+              onConfirm={() => deleteEvent(pendingDeleteEvent.id)}
               onCancel={() => setPendingDeleteId(null)}
             />
           )}
@@ -411,6 +433,7 @@ function App() {
           )}
         </div>
       )}
+      </div>
 
       {dayStartMinutes !== null && scheduledEndMinutes !== null && (
         <footer className="fixed bottom-0 left-0 right-0 flex items-center justify-between gap-2 py-3 px-4 bg-[#1b1d21]/95 backdrop-blur border-t border-neutral-800 z-40">
@@ -423,9 +446,9 @@ function App() {
               <button
                 onClick={() => setShowClearAllConfirm(true)}
                 aria-label="Tout supprimer"
-                className="w-8 h-8 rounded-full border border-neutral-700 bg-neutral-900 text-neutral-400 hover:text-red-400 hover:border-red-500 flex items-center justify-center text-base"
+                className="w-8 h-8 rounded-full border border-neutral-700 bg-neutral-900 text-neutral-400 hover:text-red-400 hover:border-red-500 flex items-center justify-center active:scale-95 transition-transform duration-100"
               >
-                🗑
+                <TrashIcon className="w-4 h-4" />
               </button>
             )}
           </div>

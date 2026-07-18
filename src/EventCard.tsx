@@ -45,6 +45,7 @@ function EventCard({
   const resizeStartY = useRef(0);
   const resizeStartDuration = useRef(0);
   const resizingActive = useRef(false);
+  const didResizeRef = useRef(false);
 
   // toujours appeler la dernière version des callbacks depuis les listeners attachés à window
   const onDragMoveRef = useRef(onDragMove);
@@ -118,7 +119,7 @@ function EventCard({
   }
 
   function handleClick() {
-    if (didDragRef.current) return;
+    if (didDragRef.current || didResizeRef.current) return;
     onEdit(event.id);
   }
 
@@ -137,6 +138,9 @@ function EventCard({
     resizingActive.current = false;
     window.removeEventListener("pointermove", handleResizeWindowPointerMove);
     window.removeEventListener("pointerup", handleResizeWindowPointerUp);
+    window.setTimeout(() => {
+      didResizeRef.current = false;
+    }, 0);
   }
 
   function handleResizePointerDown(e: ReactPointerEvent) {
@@ -144,6 +148,7 @@ function EventCard({
     resizeStartY.current = e.clientY;
     resizeStartDuration.current = event.durationMinutes;
     resizingActive.current = true;
+    didResizeRef.current = true;
     window.addEventListener("pointermove", handleResizeWindowPointerMove);
     window.addEventListener("pointerup", handleResizeWindowPointerUp);
   }
@@ -175,7 +180,7 @@ function EventCard({
                 e.stopPropagation();
                 onDelete(event.id);
               }}
-              className="flex-1 min-h-0 w-9 flex items-center justify-center text-neutral-500 hover:text-white text-base leading-none"
+              className="flex-1 min-h-0 w-9 flex items-center justify-center text-neutral-500 hover:text-white text-base leading-none active:scale-90 transition-transform duration-100"
             >
               ✕
             </button>
@@ -191,7 +196,7 @@ function EventCard({
                 e.stopPropagation();
                 onInsertAfter();
               }}
-              className="flex-1 min-h-0 w-9 flex items-center justify-center text-neutral-500 hover:text-white text-lg leading-none"
+              className="flex-1 min-h-0 w-9 flex items-center justify-center text-neutral-500 hover:text-white text-lg leading-none active:scale-90 transition-transform duration-100"
             >
               +
             </button>

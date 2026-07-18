@@ -19,6 +19,9 @@ function minutesToTimeString(minutes: number): string {
   return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
 }
 
+const fieldClass =
+  "w-full bg-neutral-800 border-none rounded-xl px-4 py-3 text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-white/30";
+
 function EventForm({ initialEvent, onSubmit, onCancel }: Props) {
   const [label, setLabel] = useState(initialEvent?.label ?? "");
   const [category, setCategory] = useState(initialEvent?.category ?? "");
@@ -52,42 +55,43 @@ function EventForm({ initialEvent, onSubmit, onCancel }: Props) {
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="flex flex-col gap-2 w-full max-w-xs"
-    >
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3 w-full">
       <input
         type="text"
         placeholder="Libellé"
         value={label}
         onChange={(e) => setLabel(e.target.value)}
         autoFocus
+        className={fieldClass}
       />
       <input
         type="text"
         placeholder="Catégorie"
         value={category}
         onChange={(e) => setCategory(e.target.value)}
+        className={fieldClass}
       />
-      <label className="flex items-center gap-2 text-sm">
+
+      <div className="flex items-center justify-between bg-neutral-800 rounded-xl px-4 py-3">
+        <span className="text-neutral-300 text-sm">Durée (minutes)</span>
         <input
           type="number"
           min={5}
           step={5}
           value={durationMinutes}
           onChange={(e) => setDurationMinutes(Number(e.target.value))}
-          className="w-20"
+          className="w-16 bg-transparent border-none text-white text-right focus:outline-none"
         />
-        minutes
-      </label>
+      </div>
 
-      <label className="flex items-center gap-2 text-sm">
+      <label className="flex items-center justify-between bg-neutral-800 rounded-xl px-4 py-3 cursor-pointer">
+        <span className="text-neutral-300 text-sm">Horaire personnalisé</span>
         <input
           type="checkbox"
           checked={isSpecialTime}
           onChange={(e) => setIsSpecialTime(e.target.checked)}
+          className="w-4 h-4 accent-white"
         />
-        Horaire personnalisé
       </label>
 
       {isSpecialTime && (
@@ -95,17 +99,25 @@ function EventForm({ initialEvent, onSubmit, onCancel }: Props) {
           type="time"
           value={specialTime}
           onChange={(e) => setSpecialTime(e.target.value)}
+          className={fieldClass}
         />
       )}
 
       {error && <p className="text-red-500 text-sm">{error}</p>}
 
-      <div className="flex gap-2">
-        <button type="submit">
-          {initialEvent ? "Enregistrer" : "Ajouter"}
-        </button>
-        <button type="button" onClick={onCancel}>
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex-1 py-3 rounded-xl border border-neutral-700 text-neutral-300 font-medium active:scale-95 transition-transform duration-100"
+        >
           Annuler
+        </button>
+        <button
+          type="submit"
+          className="flex-1 py-3 rounded-xl bg-white text-black font-semibold active:scale-95 transition-transform duration-100"
+        >
+          {initialEvent ? "Enregistrer" : "Ajouter"}
         </button>
       </div>
     </form>
