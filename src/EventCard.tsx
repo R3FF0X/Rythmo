@@ -8,6 +8,7 @@ type Props = {
   onDelete: (id: string) => void;
   onEdit: (id: string) => void;
   onResize: (id: string, durationMinutes: number) => void;
+  onInsertAfter: () => void;
   isDragging: boolean;
   onDragStart: (id: string, rect: DOMRect, pointerY: number) => void;
   onDragMove: (pointerY: number) => void;
@@ -15,7 +16,7 @@ type Props = {
   registerRef: (id: string, el: HTMLDivElement | null) => void;
 };
 
-const MIN_HEIGHT = 64;
+const MIN_HEIGHT = 96;
 const PX_PER_MINUTE = 2.2;
 const LONG_PRESS_MS = 450;
 const MOVE_CANCEL_THRESHOLD = 8;
@@ -26,6 +27,7 @@ function EventCard({
   onDelete,
   onEdit,
   onResize,
+  onInsertAfter,
   isDragging,
   onDragStart,
   onDragMove,
@@ -166,28 +168,38 @@ function EventCard({
       {!isDragging && (
         <>
           <EventCardVisual event={event} />
-          <div className="flex flex-col flex-shrink-0 bg-neutral-900 border-l border-neutral-700">
+          <div className="flex flex-col flex-shrink-0 h-full bg-neutral-900 border-l border-neutral-700">
             <button
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete(event.id);
               }}
-              className="flex-1 w-9 flex items-center justify-center text-neutral-500 hover:text-white"
+              className="flex-1 min-h-0 w-9 flex items-center justify-center text-neutral-500 hover:text-white text-base leading-none"
             >
               ✕
             </button>
             <div
               onPointerDown={handleHandlePointerDown}
-              className="flex-1 w-9 flex items-center justify-center text-neutral-500 hover:text-white cursor-grab active:cursor-grabbing touch-none"
+              className="flex-1 min-h-0 w-9 flex items-center justify-center text-neutral-500 hover:text-white cursor-grab active:cursor-grabbing touch-none text-base leading-none"
             >
               ☰
             </div>
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onInsertAfter();
+              }}
+              className="flex-1 min-h-0 w-9 flex items-center justify-center text-neutral-500 hover:text-white text-lg leading-none"
+            >
+              +
+            </button>
           </div>
 
           <div
             onPointerDown={handleResizePointerDown}
-            className="absolute bottom-0 left-0 right-0 h-2.5 cursor-row-resize touch-none flex items-center justify-center"
+            className="absolute bottom-0 left-0 right-9 h-2.5 cursor-row-resize touch-none flex items-center justify-center"
           >
             <div className="w-8 h-1 rounded-full bg-neutral-600" />
           </div>

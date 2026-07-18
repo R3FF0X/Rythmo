@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useLayoutEffect, Fragment } from "react";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import type { Event } from "./types";
 import {
   computeSchedule,
@@ -15,6 +15,7 @@ import Modal from "./Modal";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import ConfirmClearAllModal from "./ConfirmClearAllModal";
 import DayStartPicker from "./DayStartPicker";
+import { requestNotificationPermission, rescheduleNotifications } from "./notifications";
 
 const STORAGE_KEY = "rythmo-events";
 const DAY_START_KEY = "rythmo-day-start";
@@ -81,6 +82,12 @@ function App() {
   useEffect(() => {
     if (dayStartMinutes !== null) {
       localStorage.setItem(DAY_START_KEY, String(dayStartMinutes));
+    }
+  }, [dayStartMinutes]);
+
+  useEffect(() => {
+    if (dayStartMinutes !== null) {
+      requestNotificationPermission();
     }
   }, [dayStartMinutes]);
 
@@ -241,7 +248,11 @@ function App() {
     scheduled.length === 0 || scheduled[0].startMinutes > effectiveDayStart;
   const scheduledEndMinutes =
     scheduled.length > 0
-      ? Math.max(...scheduled.map((event) => event.startMinutes + event.durationMinutes))
+      ? Math.max(
+          ...scheduled.map(
+            (event) => event.startMinutes + event.durationMinutes,
+          ),
+        )
       : null;
 
   function arrayIndexAfter(scheduledIndex: number): number {
@@ -251,15 +262,13 @@ function App() {
     return idx === -1 ? events.length : idx + 1;
   }
 
-  function renderInsert(afterScheduledIndex: number) {
-    if (isFormOpen) return null;
-    return (
-      <InsertButton
-        key={`insert-${afterScheduledIndex}`}
-        onClick={() => setInsertIndex(arrayIndexAfter(afterScheduledIndex))}
-      />
-    );
-  }
+  useEffect(() => {
+    rescheduleNotifications(scheduled);
+  }, [
+    scheduled
+      .map((event) => `${event.id}:${event.startMinutes}:${event.label}`)
+      .join(","),
+  ]);
 
   useLayoutEffect(() => {
     cardRefs.current.forEach((el) => {
@@ -364,22 +373,25 @@ function App() {
 
           {!isEmpty && (
             <div className="w-full max-w-sm flex flex-col gap-2">
-              {canInsertBeforeFirst && renderInsert(-1)}
+              {canInsertBeforeFirst && (
+                <InsertButton
+                  onClick={() => setInsertIndex(arrayIndexAfter(-1))}
+                />
+              )}
               {scheduled.map((event, i) => (
-                <Fragment key={event.id}>
-                  <EventCard
-                    event={event}
-                    onDelete={setPendingDeleteId}
-                    onEdit={setEditingId}
-                    onResize={updateEventDuration}
-                    isDragging={event.id === draggingId}
-                    onDragStart={handleDragStart}
-                    onDragMove={handleDragMove}
-                    onDragEnd={handleDragEnd}
-                    registerRef={registerCardRef}
-                  />
-                  {renderInsert(i)}
-                </Fragment>
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  onDelete={setPendingDeleteId}
+                  onEdit={setEditingId}
+                  onResize={updateEventDuration}
+                  onInsertAfter={() => setInsertIndex(arrayIndexAfter(i))}
+                  isDragging={event.id === draggingId}
+                  onDragStart={handleDragStart}
+                  onDragMove={handleDragMove}
+                  onDragEnd={handleDragEnd}
+                  registerRef={registerCardRef}
+                />
               ))}
             </div>
           )}
