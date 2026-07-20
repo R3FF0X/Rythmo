@@ -16,6 +16,8 @@ import ConfirmClearAllModal from "./ConfirmClearAllModal";
 import TrashIcon from "./TrashIcon";
 import PencilIcon from "./PencilIcon";
 import CalendarLogo from "./CalendarLogo";
+import MenuToggleButton from "./MenuToggleButton";
+import SideMenu from "./SideMenu";
 import { requestNotificationPermission, rescheduleNotifications } from "./notifications";
 
 const STORAGE_KEY = "rythmo-events";
@@ -69,6 +71,7 @@ function App() {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
   const [editingStartTime, setEditingStartTime] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragRect, setDragRect] = useState<DOMRect | null>(null);
@@ -452,6 +455,15 @@ function App() {
           )}
         </div>
       </header>
+
+      <div className="fixed top-0 right-4 h-14 z-[80] flex items-center">
+        <MenuToggleButton
+          isOpen={isMenuOpen}
+          onClick={() => setIsMenuOpen((open) => !open)}
+        />
+      </div>
+
+      <SideMenu isOpen={isMenuOpen} />
 
       <div className="flex-1 overflow-y-auto flex flex-col items-center p-6 pt-24 gap-3 pb-20">
         {showClearAllConfirm && (
