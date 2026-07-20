@@ -3,35 +3,50 @@ import type { Event } from "./types";
 import {
   computeSchedule,
   hasSpecialConflict,
+  formatMinutes,
   formatEndLabel,
 } from "./types";
 import EventForm from "./EventForm";
 import EventCard from "./EventCard";
 import EventCardVisual from "./EventCardVisual";
-import StartCell from "./StartCell";
 import EditStartTimeModal from "./EditStartTimeModal";
 import Modal from "./Modal";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import ConfirmClearAllModal from "./ConfirmClearAllModal";
 import TrashIcon from "./TrashIcon";
+import PencilIcon from "./PencilIcon";
 import CalendarLogo from "./CalendarLogo";
 import { requestNotificationPermission, rescheduleNotifications } from "./notifications";
 
 const STORAGE_KEY = "rythmo-events";
 const DAY_START_KEY = "rythmo-day-start";
+const DAY_DATE_KEY = "rythmo-day-date";
 const SWAP_THRESHOLD_RATIO = 0.6;
 
-function nowMinutes(): number {
+function todayKey(): string {
   const now = new Date();
-  return now.getHours() * 60 + now.getMinutes();
+  return `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
 }
 
-function loadInitialState(): { events: Event[]; dayStartMinutes: number } {
+// Reconstruit l'instant réel de fin de journée : la date à laquelle l'heure de
+// début a été choisie, plus le nombre de minutes écoulées jusqu'à la fin de la
+// dernière tâche (qui peut dépasser 24h pour une tâche finissant après minuit).
+function computeAbsoluteEnd(dateKey: string, endMinutes: number): Date {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const date = new Date(y, m, d, 0, 0, 0, 0);
+  date.setMinutes(date.getMinutes() + endMinutes);
+  return date;
+}
+
+function loadInitialState(): {
+  events: Event[];
+  dayStartMinutes: number | null;
+} {
   const rawEvents = localStorage.getItem(STORAGE_KEY);
   const rawDayStart = localStorage.getItem(DAY_START_KEY);
   return {
     events: rawEvents ? JSON.parse(rawEvents) : [],
-    dayStartMinutes: rawDayStart ? Number(rawDayStart) : nowMinutes(),
+    dayStartMinutes: rawDayStart ? Number(rawDayStart) : null,
   };
 }
 
@@ -46,7 +61,7 @@ type Segment = {
 
 function App() {
   const [events, setEvents] = useState<Event[]>(initialData.events);
-  const [dayStartMinutes, setDayStartMinutes] = useState<number>(
+  const [dayStartMinutes, setDayStartMinutes] = useState<number | null>(
     initialData.dayStartMinutes,
   );
   const [insertIndex, setInsertIndex] = useState<number | null>(null);
@@ -65,7 +80,6 @@ function App() {
 
   const cardRefs = useRef(new Map<string, HTMLDivElement>());
   const prevRectsRef = useRef(new Map<string, DOMRect>());
-  const startCellRef = useRef<HTMLDivElement | null>(null);
   const listContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -73,7 +87,11 @@ function App() {
   }, [events]);
 
   useEffect(() => {
-    localStorage.setItem(DAY_START_KEY, String(dayStartMinutes));
+    if (dayStartMinutes !== null) {
+      localStorage.setItem(DAY_START_KEY, String(dayStartMinutes));
+    } else {
+      localStorage.removeItem(DAY_START_KEY);
+    }
   }, [dayStartMinutes]);
 
   useEffect(() => {
@@ -84,6 +102,23 @@ function App() {
     const id = window.setInterval(() => setNow(new Date()), 30000);
     return () => window.clearInterval(id);
   }, []);
+
+  // Si une heure de début existe déjà (agenda repris d'une session précédente)
+  // mais qu'aucune date n'a été enregistrée, on suppose "aujourd'hui" plutôt
+  // que de ne jamais expirer l'agenda.
+  useEffect(() => {
+    if (dayStartMinutes !== null && !localStorage.getItem(DAY_DATE_KEY)) {
+      localStorage.setItem(DAY_DATE_KEY, todayKey());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleSaveDayStart(minutes: number) {
+    if (dayStartMinutes === null) {
+      localStorage.setItem(DAY_DATE_KEY, todayKey());
+    }
+    setDayStartMinutes(minutes);
+  }
 
   // addEvent/updateEvent ne ferment plus le formulaire elles-mêmes : c'est la
   // modale qui déclenche la fermeture (avec animation) une fois le résultat connu.
@@ -129,7 +164,8 @@ function App() {
 
   function clearAllEvents() {
     setEvents([]);
-    setDayStartMinutes(nowMinutes());
+    setDayStartMinutes(null);
+    localStorage.removeItem(DAY_DATE_KEY);
   }
 
   function updateEventDuration(id: string, durationMinutes: number) {
@@ -223,7 +259,8 @@ function App() {
     (event) => event.id === pendingDeleteId,
   );
   const isFormOpen = insertIndex !== null || editingId !== null;
-  const scheduled = computeSchedule(events, dayStartMinutes);
+  const scheduled =
+    dayStartMinutes !== null ? computeSchedule(events, dayStartMinutes) : [];
   const draggedEvent = scheduled.find((event) => event.id === draggingId);
   const scheduledEndMinutes =
     scheduled.length > 0
@@ -232,7 +269,7 @@ function App() {
             (event) => event.startMinutes + event.durationMinutes,
           ),
         )
-      : dayStartMinutes;
+      : (dayStartMinutes ?? 0);
 
   function arrayIndexAfter(scheduledIndex: number): number {
     if (scheduledIndex === -1) return 0;
@@ -240,6 +277,32 @@ function App() {
     const idx = events.findIndex((e) => e.id === afterId);
     return idx === -1 ? events.length : idx + 1;
   }
+
+  // Réinitialise l'agenda seulement une fois qu'on a changé de jour calendaire
+  // ET qu'il n'y a plus de tâche en cours (une tâche finissant à 0h30 le
+  // lendemain doit rester affichée jusqu'à cette heure-là avant de tout vider).
+  useEffect(() => {
+    if (dayStartMinutes === null) return;
+    const dateKey = localStorage.getItem(DAY_DATE_KEY);
+    if (!dateKey) return;
+
+    const isNewDay = dateKey !== todayKey();
+    if (!isNewDay) return;
+
+    if (scheduled.length === 0) {
+      setEvents([]);
+      setDayStartMinutes(null);
+      localStorage.removeItem(DAY_DATE_KEY);
+      return;
+    }
+
+    const absoluteEnd = computeAbsoluteEnd(dateKey, scheduledEndMinutes);
+    if (now > absoluteEnd) {
+      setEvents([]);
+      setDayStartMinutes(null);
+      localStorage.removeItem(DAY_DATE_KEY);
+    }
+  }, [now, dayStartMinutes, scheduledEndMinutes, scheduled.length]);
 
   useEffect(() => {
     rescheduleNotifications(scheduled);
@@ -249,26 +312,24 @@ function App() {
       .join(","),
   ]);
 
-  // Position de la barre "heure actuelle" — calculée à partir des positions
-  // réelles de la cellule Début et des cartes affichées.
+  // Position de la barre "heure actuelle" — masquée en dehors de la plage
+  // [début de journée, fin de la dernière tâche], et s'il n'y a aucune tâche.
   useLayoutEffect(() => {
+    if (dayStartMinutes === null || scheduled.length === 0) {
+      setNowLineTop(null);
+      return;
+    }
+
     const containerEl = listContainerRef.current;
-    const startEl = startCellRef.current;
-    if (!containerEl || !startEl) {
+    if (!containerEl) {
       setNowLineTop(null);
       return;
     }
 
     const containerTop = containerEl.getBoundingClientRect().top;
-    const segments: Segment[] = [];
-
-    const startRect = startEl.getBoundingClientRect();
-    segments.push({
-      startMinutes: dayStartMinutes,
-      endMinutes: dayStartMinutes,
-      top: startRect.bottom - containerTop,
-      bottom: startRect.bottom - containerTop,
-    });
+    const segments: Segment[] = [
+      { startMinutes: dayStartMinutes, endMinutes: dayStartMinutes, top: 0, bottom: 0 },
+    ];
 
     scheduled.forEach((event) => {
       const el = cardRefs.current.get(event.id);
@@ -285,14 +346,10 @@ function App() {
     segments.sort((a, b) => a.startMinutes - b.startMinutes);
 
     const nowM = now.getHours() * 60 + now.getMinutes();
+    const rangeEnd = segments[segments.length - 1].endMinutes;
 
-    if (nowM <= segments[0].startMinutes) {
-      setNowLineTop(segments[0].top);
-      return;
-    }
-    const last = segments[segments.length - 1];
-    if (nowM >= last.endMinutes) {
-      setNowLineTop(last.bottom);
+    if (nowM < dayStartMinutes || nowM > rangeEnd) {
+      setNowLineTop(null);
       return;
     }
 
@@ -371,8 +428,29 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#1b1d21] flex flex-col">
-      <header className="fixed top-0 left-0 right-0 z-30 flex items-center justify-center px-4 py-3 bg-[#1b1d21]/95 backdrop-blur border-b border-neutral-800">
-        <CalendarLogo className="w-8 h-8" />
+      <header className="fixed top-0 left-0 right-0 z-30 h-14 bg-[#1b1d21]/95 backdrop-blur border-b border-neutral-800">
+        <div className="relative w-full h-full">
+          <div
+            className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 transition-[left] duration-300 ease-out"
+            style={{ left: dayStartMinutes !== null ? "2.5rem" : "50%" }}
+          >
+            <CalendarLogo className="w-8 h-8" />
+          </div>
+
+          {dayStartMinutes !== null && (
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+              <button
+                onClick={() => setEditingStartTime(true)}
+                className="modal-content-in flex items-center gap-1.5 bg-neutral-800 rounded-full pl-3 pr-2.5 py-1.5 active:scale-95 transition-transform duration-100"
+              >
+                <span className="text-white text-sm font-medium whitespace-nowrap">
+                  Commence aujourd'hui à {formatMinutes(dayStartMinutes)}
+                </span>
+                <PencilIcon className="w-3.5 h-3.5 text-neutral-400" />
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto flex flex-col items-center p-6 pt-24 gap-3 pb-20">
@@ -386,7 +464,7 @@ function App() {
         {editingStartTime && (
           <EditStartTimeModal
             currentMinutes={dayStartMinutes}
-            onSave={setDayStartMinutes}
+            onSave={handleSaveDayStart}
             onCancel={() => setEditingStartTime(false)}
           />
         )}
@@ -422,42 +500,82 @@ function App() {
           />
         )}
 
-        <div
-          ref={listContainerRef}
-          className="relative w-full max-w-sm flex flex-col gap-2"
-        >
-          {nowLineTop !== null && (
-            <div
-              className="absolute -left-2 -right-2 h-0.5 bg-red-500 rounded-full pointer-events-none z-20"
-              style={{ top: nowLineTop }}
-            />
-          )}
+        {dayStartMinutes === null && (
+          <div className="flex-1 w-full flex items-center justify-center">
+            <button
+              onClick={() => setEditingStartTime(true)}
+              className="px-6 py-3 rounded-xl bg-white text-black font-semibold active:scale-95 transition-transform duration-100"
+            >
+              Choisir l'heure de début
+            </button>
+          </div>
+        )}
 
-          <StartCell
-            startMinutes={dayStartMinutes}
-            onEdit={() => setEditingStartTime(true)}
-            onInsertAfter={() => setInsertIndex(0)}
-            registerRef={(el) => {
-              startCellRef.current = el;
-            }}
-          />
+        {dayStartMinutes !== null && scheduled.length === 0 && (
+          <div className="flex-1 w-full flex items-center justify-center">
+            {!isFormOpen && (
+              <button
+                onClick={() => setInsertIndex(0)}
+                className="w-14 h-14 rounded-full border border-neutral-700 text-white text-2xl flex items-center justify-center active:scale-95 transition-transform duration-100"
+              >
+                +
+              </button>
+            )}
+          </div>
+        )}
 
-          {scheduled.map((event, i) => (
-            <EventCard
-              key={event.id}
-              event={event}
-              onDelete={setPendingDeleteId}
-              onEdit={setEditingId}
-              onResize={updateEventDuration}
-              onInsertAfter={() => setInsertIndex(arrayIndexAfter(i))}
-              isDragging={event.id === draggingId}
-              onDragStart={handleDragStart}
-              onDragMove={handleDragMove}
-              onDragEnd={handleDragEnd}
-              registerRef={registerCardRef}
-            />
-          ))}
-        </div>
+        {dayStartMinutes !== null && scheduled.length > 0 && (
+          <div
+            ref={listContainerRef}
+            className="relative w-full max-w-sm flex flex-col gap-2"
+          >
+            {nowLineTop !== null && (
+              <div
+                className="absolute -left-2 -right-2 pointer-events-none z-20"
+                style={{ top: nowLineTop }}
+              >
+                <div className="relative h-0.5 bg-red-500">
+                  <div
+                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1"
+                    style={{
+                      width: 0,
+                      height: 0,
+                      borderTop: "5px solid transparent",
+                      borderBottom: "5px solid transparent",
+                      borderLeft: "7px solid #ef4444",
+                    }}
+                  />
+                  <div
+                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1"
+                    style={{
+                      width: 0,
+                      height: 0,
+                      borderTop: "5px solid transparent",
+                      borderBottom: "5px solid transparent",
+                      borderRight: "7px solid #ef4444",
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {scheduled.map((event, i) => (
+              <EventCard
+                key={event.id}
+                event={event}
+                onDelete={setPendingDeleteId}
+                onEdit={setEditingId}
+                onResize={updateEventDuration}
+                onInsertAfter={() => setInsertIndex(arrayIndexAfter(i))}
+                isDragging={event.id === draggingId}
+                onDragStart={handleDragStart}
+                onDragMove={handleDragMove}
+                onDragEnd={handleDragEnd}
+                registerRef={registerCardRef}
+              />
+            ))}
+          </div>
+        )}
 
         {draggingId && dragRect && draggedEvent && (
           <div
@@ -474,21 +592,23 @@ function App() {
         )}
       </div>
 
-      <footer className="fixed bottom-0 left-0 right-0 flex items-center justify-between gap-2 py-3 px-4 bg-[#1b1d21]/95 backdrop-blur border-t border-neutral-800 z-40">
-        <div className="w-8 h-8 flex-shrink-0" />
-        <p className="flex-1 text-center text-neutral-300 text-sm truncate">
-          {formatEndLabel(scheduledEndMinutes)}
-        </p>
-        <div className="w-8 h-8 flex-shrink-0">
-          <button
-            onClick={() => setShowClearAllConfirm(true)}
-            aria-label="Tout supprimer"
-            className="w-8 h-8 rounded-full border border-neutral-700 bg-neutral-900 text-neutral-400 hover:text-red-400 hover:border-red-500 flex items-center justify-center active:scale-95 transition-transform duration-100"
-          >
-            <TrashIcon className="w-4 h-4" />
-          </button>
-        </div>
-      </footer>
+      {dayStartMinutes !== null && (
+        <footer className="fixed bottom-0 left-0 right-0 flex items-center justify-between gap-2 py-3 px-4 bg-[#1b1d21]/95 backdrop-blur border-t border-neutral-800 z-40">
+          <div className="w-8 h-8 flex-shrink-0" />
+          <p className="flex-1 text-center text-neutral-300 text-sm truncate">
+            {formatEndLabel(scheduledEndMinutes)}
+          </p>
+          <div className="w-8 h-8 flex-shrink-0">
+            <button
+              onClick={() => setShowClearAllConfirm(true)}
+              aria-label="Tout supprimer"
+              className="w-8 h-8 rounded-full border border-neutral-700 bg-neutral-900 text-neutral-400 hover:text-red-400 hover:border-red-500 flex items-center justify-center active:scale-95 transition-transform duration-100"
+            >
+              <TrashIcon className="w-4 h-4" />
+            </button>
+          </div>
+        </footer>
+      )}
     </div>
   );
 }

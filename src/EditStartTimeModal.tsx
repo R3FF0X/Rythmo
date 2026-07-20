@@ -2,7 +2,7 @@ import { useState } from "react";
 import Modal from "./Modal";
 
 type Props = {
-  currentMinutes: number;
+  currentMinutes: number | null;
   onSave: (minutes: number) => void;
   onCancel: () => void;
 };
@@ -45,7 +45,9 @@ function roundToStep(minutes: number): string {
 }
 
 function EditStartTimeModal({ currentMinutes, onSave, onCancel }: Props) {
-  const [time, setTime] = useState(roundToStep(currentMinutes));
+  const [time, setTime] = useState(
+    roundToStep(currentMinutes ?? nowMinutes()),
+  );
 
   return (
     <Modal onClose={onCancel}>

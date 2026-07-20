@@ -16,8 +16,8 @@ type Props = {
   registerRef: (id: string, el: HTMLDivElement | null) => void;
 };
 
-const MIN_HEIGHT = 96;
-const PX_PER_MINUTE = 2.2;
+const MIN_HEIGHT = 80;
+const PX_PER_MINUTE = 4;
 const LONG_PRESS_MS = 450;
 const MOVE_CANCEL_THRESHOLD = 8;
 const RESIZE_MIN_DURATION = 5;
