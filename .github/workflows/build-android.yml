@@ -35,6 +35,19 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x android/gradlew
 
+      - name: Use a fixed debug signing key (so updates install cleanly)
+        run: |
+          mkdir -p ~/.android
+          if [ -f android/debug.keystore ]; then
+            cp android/debug.keystore ~/.android/debug.keystore
+          else
+            keytool -genkeypair -v -keystore ~/.android/debug.keystore \
+              -storepass android -keypass android -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+            cp ~/.android/debug.keystore android/debug.keystore
+          fi
+
       - name: Build APK
         run: cd android && ./gradlew assembleDebug
 
@@ -43,3 +56,9 @@ jobs:
         with:
           name: rythmo-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload debug keystore (only needed once, to commit it)
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-keystore
+          path: android/debug.keystore
